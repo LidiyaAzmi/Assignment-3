@@ -1,0 +1,312 @@
+---
+title: "College Drop-outs"
+runtime: shiny
+output:
+  flexdashboard::flex_dashboard:
+    social: ["menu"]
+---
+
+```{r global, include=FALSE}
+library (flexdashboard)
+library (readr)
+dataset <- read_csv("dataset.csv")
+
+percent <- function(number){
+  return(number/nrow(dataset)*100)
+}
+
+intl <- function(target){
+  return(dataset$International == 1 & dataset$Target == target)
+}
+
+colour = c("brown","blue")
+  
+#local <- function(target){
+ #amt2 = sum(dataset$International == 0 & dataset$Target == target)
+ #return (amt2)
+#}
+
+```
+
+# General {data-icon="fa-user"}
+
+## Column 1
+
+### Enrolled
+
+```{r}
+enrolled = sum(dataset$Target == "Enrolled")
+valueBox(enrolled,icon = "fa-pencil",col = "skyblue")
+
+```
+
+### Enrolled
+
+```{r}
+enrolled_per = percent(enrolled)
+
+gauge(enrolled_per, min = 0, max = 100, symbol = '%', gaugeSectors(
+  success = c(80, 100), warning = c(40, 79), danger = c(0, 39)
+))
+```
+
+### Statistics
+
+```{r}
+#en_intl = intl("Enrolled")
+#en_local = local("Enrolled")
+
+en_stat <- table(intl("Enrolled"))
+text(x = barplot(en_stat,beside = TRUE, names = c("Local","International"),col=colour), label = en_stat, pos = 3, cex = 0.8, col = "black")
+
+# Specify the range and number of ticks for the y-axis
+axis(side = 2, at = pretty(range(nrow(dataset)), n = 5))
+
+```
+
+## Column 2
+
+### Graduated
+
+```{r}
+graduated = sum(dataset$Target == "Graduate")
+
+valueBox(graduated,icon = "fa-graduation-cap",col = "lightgreen")
+
+```
+
+### Graduated
+
+```{r}
+grad_per = percent(graduated)
+
+gauge(grad_per, min = 0, max = 100, symbol = '%', gaugeSectors(
+  success = c(80, 100), warning = c(40, 79), danger = c(0, 39)
+))
+```
+
+### Statistics
+
+```{r}
+grad_stat <- table(intl("Graduate"))
+text(x = barplot(grad_stat,beside = TRUE, names = c("Local","International"),col=colour), label = grad_stat, pos = 3, cex = 0.8, col = "black")
+
+# Specify the range and number of ticks for the y-axis
+axis(side = 2, at = pretty(range(nrow(dataset)), n = 5))
+```
+
+## Column 3
+
+### Dropouts
+
+```{r}
+dropouts = sum(dataset$Target == "Dropout")
+
+valueBox(dropouts,icon = "fa-user-times",col = "salmon")
+
+```
+
+### Dropouts
+
+```{r}
+do_per = percent(dropouts)
+
+gauge(do_per, min = 0, max = 100, symbol = '%', gaugeSectors(
+  success = c(80, 100), warning = c(40, 79), danger = c(0, 39)
+))
+```
+
+### Statistics
+
+```{r}
+do_stat <- table(intl("Dropout"))
+text(x = barplot(do_stat,beside = TRUE, names = c("Local","International"),col=colour), label = do_stat, pos = 3, cex = 0.8, col = "black")
+
+# Specify the range and number of ticks for the y-axis
+axis(side = 2, at = pretty(range(nrow(dataset)), n = 5))
+```
+
+# Category {data-icon="fa-graduation-cap"}
+
+## Column 1 {.sidebar}
+
+```{r}
+selectInput(inputId = "gender_choice", label = "Gender:",
+              choices = c("Male", "Female"), selected = "Male")
+
+selectInput("course_name", label = "Course:",
+              choices = c(dataset$Course), selected = 0)
+
+sliderInput(
+  inputId = "age_adjust", label = "Age at enrollment:",
+  min = 15, max = 70, value = 1, step = 1
+)
+
+```
+
+## Column 2
+
+### No. of dropouts
+
+```{r}
+### No. of dropouts vs Gender, Course, and Age at enrollment
+renderPlot({
+  # Ensure all required inputs are available
+  req(input$gender_choice, input$course_name, input$age_adjust)
+  
+  # Convert input$gender_choice to 0 for Female and 1 for Male
+  gender_num <- ifelse(input$gender_choice == "Female", 0, 1)
+  
+  # Define all possible categories
+  categories <- c("Dropout", "Enrolled", "Graduate")
+  
+  # Initialize counts for all categories to zero
+  counts <- rep(0, length(categories))
+  
+  # Subset the dataset based on all three conditions
+  subset_data <- dataset[dataset$Gender == gender_num & 
+                        dataset$Course == input$course_name & 
+                        dataset$`Age at enrollment` == input$age_adjust, ]
+  
+  # Calculate the counts for each category from the subset data
+  subset_counts <- table(subset_data$Target)
+  
+  # Match the subset counts with the predefined categories
+  counts[match(names(subset_counts), categories)] <- subset_counts
+  
+  # Calculate the maximum count among all categories for y-axis scaling
+  max_count <- max(counts)
+  
+  # Check if counts is empty or contains only NA values
+  if (sum(counts) == 0) {
+    # If counts is empty or contains only NA values, show a message
+    plot(0, type = "n", xlab = "Category", ylab = "Count", main = "Number of each category")
+    text(0, 0, "No data available", col = "red", cex = 1.5)
+  } else {
+    # Calculate suitable xlim based on the number of categories
+    num_categories <- length(categories)
+    xlim <- c(0.2, num_categories + 1)  # Add padding for better visualization
+  
+    # Create bar plot
+    barplot(counts, 
+            main = "No. of Dropouts vs Gender, Course, and Age",
+            xlab = "Category",
+            ylab = "Count",
+            col = c("salmon", "skyblue", "lightgreen"),  # Customize colors based on "Target" variable
+            ylim = c(0, max_count * 1.1), 
+            xlim = xlim,
+            beside = TRUE,
+            names = c("Dropout","Enrolled","Graduated")
+            )
+    
+    # Add data labels to the bars
+    text(x = 1:num_categories, y = counts, labels = counts, pos = 3, cex = 0.8, col = "black")
+  }
+}, width = 450, height = 550)  # Set width and height to control the size of the plot area
+
+
+
+```
+
+## Column 3
+
+### No. of dropouts vs Gender
+
+```{r}
+renderPlot({
+  req(input$gender_choice)  # Ensure input$gender_choice is available
+  
+  # Convert input$gender_choice to 0 for Female and 1 for Male
+  gender_num <- ifelse(input$gender_choice == "Female", 0, 1)
+  
+  # Subset the dataset based on the converted gender choice
+  gender_subset <- dataset[dataset$Gender == gender_num, c("Gender", "Target")]
+  
+  # Create a table of counts for the "Target" variable (e.g., Dropout, Enrolled, Graduate)
+  gender_counts <- table(gender_subset$Target)
+  
+  # Create a bar plot of the counts
+  barplot(gender_counts, 
+          main = paste("Number of", input$gender_choice, "in Each Category"),
+          ylab = "Count",
+          col = c("salmon","skyblue","lightgreen"),  # Set color of bars
+          ylim = c(0, max(gender_counts) * 2),  # Set y-axis limits to ensure all bars are visible
+          beside = TRUE)  # Display bars side by side
+  
+  # Add data labels to the bars
+  text(x = 1:length(gender_counts), y = gender_counts, labels = gender_counts, pos = 3, cex = 0.8, col = "black")
+})
+
+```
+
+### No. of dropouts vs Course
+
+```{r}
+renderPlot({
+  req(input$course_name)  # Ensure input$course_name is available
+  
+  # Subset the dataset based on the converted gender choice
+  course_subset <- dataset[dataset$Course == input$course_name, c("Course", "Target")]
+  
+  # Create a table of counts for the "Target" variable (e.g., Dropout, Enrolled, Graduate)
+  course_counts <- table(course_subset$Target)
+  
+  # Create a bar plot of the counts
+  barplot(course_counts, 
+          main = paste("Number of", input$course_name, "in Each Category"),
+          ylab = "Count",
+          col = c("salmon","skyblue","lightgreen"),  # Set color of bars
+          ylim = c(0, max(course_counts) * 2),  # Set y-axis limits to ensure all bars are visible
+          beside = TRUE)  # Display bars side by side
+  
+  # Add data labels to the bars
+  text(x = 1:length(course_counts), y = course_counts, labels = course_counts, pos = 3, cex = 0.8, col = "black")
+})
+```
+
+### No. of dropouts vs Age at enrollment
+
+```{r}
+renderPlot({
+  req(input$age_adjust)  # Ensure input$course_name is available
+  
+  # Define all possible categories
+  categories <- c("Dropout", "Enrolled", "Graduate")
+  
+  # Initialize counts for all categories to zero
+  counts <- rep(0, length(categories))
+  
+  # Subset the dataset based on the converted gender choice
+  age_subset <- dataset[dataset$`Age at enrollment` == input$age_adjust, c("Age at enrollment", "Target")]
+  
+  # Calculate the counts for each category from the subset data
+  subset_counts <- table(age_subset$Target)
+  
+  # Match the subset counts with the predefined categories
+  counts[match(names(subset_counts), categories)] <- subset_counts
+  
+  # Check if counts is empty or contains only NA values
+  if (sum(counts) == 0) {
+    # If counts is empty or contains only NA values, show a message
+    plot(0, type = "n", xlab = "Category", ylab = "Count", main = "Number of each category")
+    text(0, 0, "No data available", col = "red", cex = 1.5)
+  } else {
+    # Calculate suitable xlim based on the number of categories
+    num_categories <- length(categories)
+    xlim <- c(0.2, num_categories + 1)  # Add padding for better visualization
+    
+    # Create a bar plot of the counts
+    barplot(counts, 
+            main = paste("Number of", input$age_adjust, "year-old in Each Category"),
+            ylab = "Count",
+            col = c("salmon","skyblue","lightgreen"),  # Set color of bars
+            ylim = c(0.2, max(counts) * 2),  # Set y-axis limits to ensure all bars are visible
+            xlim = xlim,
+            beside = TRUE,  # Display bars side by side
+            names = c("Dropout","Enrolled","Graduated")) 
+    # Add data labels to the bars
+    text(x = 1:num_categories, y = counts, labels = counts, pos = 3, cex = 0.8, col = "black")
+  }
+})
+
+```
